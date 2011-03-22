@@ -1,0 +1,7 @@
+This is assembler for Xilinx processor KCPSM3. All C source codes are provided under GNU GPL license.
+In the doc/ directory you can find a documentation. If you make any changes to the program, you can add
+your stuff there.
+
+Currently provided tests in directory test/ were downloaded from the internet (bleyer.org/pacoblaze; xilinx).
+There are some my own tests.
+
