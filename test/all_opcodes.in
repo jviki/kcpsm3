@@ -1,0 +1,104 @@
+;
+; Author: Jan Viktorin
+; License: GNU GPL
+;
+JUMP 005
+prev:
+JUMP next
+JUMP prev
+JUMP C, 007
+JUMP Z, 008
+JUMP NC, 009
+JUMP NZ, 00A
+JUMP C, prev
+JUMP Z, prev
+JUMP NC, prev
+JUMP NZ, prev
+JUMP C, next
+JUMP Z, next
+JUMP NC, next
+JUMP NC, next
+CALL 345
+CALL next
+CALL prev
+CALL C, 065
+CALL Z, 066
+CALL NC, 064
+CALL NZ, 063
+CALL C, prev
+CALL Z, prev
+CALL NC, prev
+CALL NZ, prev
+CALL C, next
+CALL Z, next
+CALL NC, next
+CALL NZ, next
+next:
+RETURN
+RETURN C
+RETURN Z
+RETURN NC
+RETURN NZ
+RETURNI ENABLE
+RETURNI DISABLE
+ENABLE INTERRUPT
+DISABLE INTERRUPT
+LOAD s5, FF
+LOAD s9, s1
+LOAD sF, a
+AND s4, FE
+AND s8, s0
+AND sE, c
+OR s3, FD
+OR s7, sF
+OR sD, add
+XOR s2, FC
+XOR s6, sE
+XOR sC, sub
+TEST s1, FB
+TEST s5, sD
+TEST sB, constant
+ADD s0, FA
+ADD s4, sC
+ADD sA, data
+ADDCY sF, F0
+ADDCY s3, sB
+ADDCY s9, dataxy0934232
+SUB sE, EF
+SUB s2, sA
+SUB s8, 0001
+SUBCY sD, EE
+SUBCY s1, s9
+SUBCY s7, 0cx
+COMPARE sC, ED
+COMPARE s0, s8
+COMPARE s6, abcd
+SR0 s0
+SR1 s1
+SRX s2
+SRA s3
+RR s4
+SL0 sF
+SL1 sE
+SLX sD
+SLA sC
+RL sB
+OUTPUT sB, EB
+OUTPUT sF, (s7)
+INPUT sA, EA
+INPUT sE, (s6)
+STORE s9, 3F
+STORE sD, (s5)
+FETCH s8, 3E
+FETCH sC, (s4)
+
+CONSTANT a, 09
+CONSTANT c, 43
+CONSTANT add, 44
+CONSTANT sub, 99
+CONSTANT constant, Fe
+CONSTANT data, aa
+CONSTANT dataxy0934232, 00
+CONSTANT 0001, 11
+CONSTANT 0cx, ac
+CONSTANT abcd, ab

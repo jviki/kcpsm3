@@ -1,0 +1,26 @@
+Tests can be run simply using script runtest.sh:
+	$ ./runtest.sh
+
+First compiles the pico in the ../src directory and then runs all packed tests.
+Files *.in are source files with KCPSM3 assembler code and *.out files are
+results from the original KCPSM3.EXE program provided by Xilinx.
+
+The test 'extension' will fail unless you run the tests like this:
+	$ ./runtest.sh -extension
+
+Results from the tests are in files *.res and *.stderr. These files can be easily removed
+simply calling:
+	$ ./runtest.sh -clean
+
+You can test also with valgrind:
+	$ ./runtest.sh -valgrind
+or
+	$ ./runtest.sh -extension -valgrind
+
+Output from valgrind is stored in the file <test>.stderr.
+
+For debugging it is possible to compile with -DDEBUG flag (modify the Makefile or runtest.sh script
+for that purpose). After that output from the assembler run is stored in the <test>.stderr file.
+
+--
+Copyright (c) 2010 Jan Viktorin

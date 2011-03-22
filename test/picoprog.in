@@ -1,0 +1,176 @@
+;
+; Author: Jan Viktorin
+; License: GNU GPL
+;
+
+;
+; Inspirovano demo aplikaci picocpu_demo.
+;
+
+; =====================
+; Program blika diodou. Reaguje na preruseni zapisem do portu s ID 01 (X_PORT).
+; Predpoklada se (viz top_level.vhd), ze tento port je propagovan na vystup FPGA X(17 downto 10).
+; Tato propojeni vedou na vystupni piny FPGA (24, 23, 22, 21, 20, 19, 18, 17). Na nich je mozne
+; merit napeti. Pokud neni zmackunta zadna klavesa, jsou vsechny piny v log. 1 (cca 3V) podle
+; dale zminene konvence. V pripade,
+; ze je zmacknuta klavesa, je jeji prijaty kod propagovan na tyto piny.
+; =====================
+; Vstupni port ma 8 bitu, klavesnice 16 tlacitek. Prichazi tedy 4 (vyznamne) bity,
+; ktere urcuji stisknutou klavesu (viz top_level.vhd).
+; Kodovani (K - klavesa, B - binarne, D - dekadicky): 
+;   K   B           D
+;   0   0000 0000   0
+;   1   0000 0001   1
+;   2   0000 0010   2
+;   3   0000 0011   3
+;   ...
+;   A   0000 1010   10
+;   B   0000 1011   11
+;   C   0000 1100   12
+;   D   0000 1101   13
+;   *   0000 1110   14
+;   #   0000 1111   15
+;
+; Pri nestisknute klavese prichazi: 1111 1111
+; =====================
+; Rychlost blikani diody lze ovlivnit konstantami A_INC, B_INC, C_INC.
+; Nejpomalejsi nastaveni je A_INC = B_INC = C_INC = 1. 
+; Dioda sviti v aktivni NULE (implicitne - viz top_level.vhd).
+; =====================
+
+
+; =====================
+; pojmenovani pracovnich registru
+NAMEREG s0, key                 ; registr pro nacteni klavesy ze vstupu
+NAMEREG s1, led                 ; registr, kterym se zapisuje do diody
+NAMEREG s6, test                ; registr, pro ulozeni dat k testovani nebo porovnavani
+NAMEREG s5, cmd                 ; prikaz pro LCD
+
+; =====================
+; pojmenovani registru pro zpozdeni
+NAMEREG s2, a
+NAMEREG s3, b
+NAMEREG s4, c
+
+; =====================
+; konstanty pouzite v programu
+CONSTANT LED_ON,        00      ; LED sviti
+CONSTANT LED_OFF,       01      ; LED nesviti 
+
+CONSTANT NO_KEY,        FF      ; nebyla zmacknuta zadna klavesa
+CONSTANT KEY_PORT,      00      ; adresa portu, ze ktereho cteme klavesy
+CONSTANT LED_PORT,      00      ; adresa portu, na kterem je LED dioda
+CONSTANT X_PORT,        01      ; adresa portu, na kterem jsou X vyvody
+CONSTANT LCD_NORS_PORT, 02      ; adresa portu, na kterem jsou LCD vyvody pri RS = 0
+CONSTANT LCD_RS_PORT,   03      ; adresa portu, na kterem jsou LCD vyvody pri RS = 1
+
+; 0000 0001
+CONSTANT LCD_CLEAR,     01      ; prikaz pro smazani LCD
+; 0000 1110
+CONSTANT LCD_DISP_INIT, 0E      ; prikaz pro inicializaci displeje
+; 0000 0110
+CONSTANT LCD_EMODE,     06      ; prikaz pro nastaveni modu
+; 0011 10xx
+CONSTANT LCD_FCE_SET,   78      ; prikaz pro chovani
+
+CONSTANT A_INC,         02      ; hodnota pro inkrementovani zpozdovaci smycky a
+CONSTANT B_INC,         02      ; hodnota pro inkrementovani zpozdovaci smycky b
+CONSTANT C_INC,         02      ; hodnota pro inkrementovani zpozdovaci smycky c
+
+CONSTANT LAST_KEY,		00		  ; adresa promenne LAST_KEY
+
+; =====================
+; zacatek programu
+start:
+    LOAD    led, LED_OFF        ; zhasneme diodu
+    OUTPUT  led, LED_PORT 
+    LOAD    key, NO_KEY         ; zapiseme na vystup X same jednicky (zadny vstup)
+    OUTPUT  key, X_PORT
+    STORE	key, LAST_KEY		  ; ulozime do pameti posledni klavesu
+    ; == PRIPRAVA DISPLEJE:
+;    LOAD    cmd, LCD_CLEAR      ; vymazeme LCD
+;    OUTPUT  cmd, LCD_NORS_PORT
+;    LOAD    cmd, LCD_FCE_SET    ; rezim 8bitovych operaci, 2 radky, 5x8 znaky 
+;    OUTPUT  cmd, LCD_NORS_PORT
+;    LOAD    cmd, LCD_DISP_INIT  ; inicializace displeje
+;    OUTPUT  cmd, LCD_NORS_PORT
+;    LOAD    cmd, LCD_EMODE      ; entry mode: inkrementace adresy o 1
+;    OUTPUT  cmd, LCD_NORS_PORT
+    ; == =================
+    ENABLE  INTERRUPT           ; povolime preruseni
+loop:
+    CALL wait                   ; blikame diodou
+    ADD led, 01
+    OUTPUT led, LED_PORT
+    JUMP    loop                ; nekonecna smycka
+
+; =====================
+; podprogram pro zpozdeni (tri zanorene smycky)
+wait:
+    LOAD    c, 00
+wait_c:                         ; vnejsi smycka
+    ADD     c, C_INC
+    LOAD    b, 00
+wait_b:                         ; mezi smycka
+    ADD     b, B_INC
+    LOAD    a, 00
+wait_a:                         ; vnitrni smycka
+    ADD     a, A_INC
+    JUMP    NZ, wait_a
+    
+    COMPARE b, 00
+    JUMP    NZ, wait_b
+
+    COMPARE c, 00
+    JUMP    NZ, wait_c
+
+    RETURN
+
+; =====================
+; obsluha preruseni z klavesnice
+keyboard:
+    DISABLE INTERRUPT           ; zakaz preruseni v preruseni (nyni nelze primat dalsi klavesy)
+    INPUT   key, KEY_PORT       ; nacteni cisla klavesy
+    OUTPUT  key, X_PORT         ; posleme klavesu na vystup X
+
+    COMPARE key, NO_KEY         ; test na NO_KEY
+    JUMP Z, end_kb              ; pokud neni nic zmacknuto, jde se pryc
+    
+    FETCH test, LAST_KEY		  ; pokud prisla stejna klavesa, ukoncime preruseni
+    COMPARE key, test
+    JUMP Z, end_kb
+
+    COMPARE key, 0E             ; test na hvezdicku
+    JUMP Z, star_key
+
+    COMPARE key, 0F             ; test na krizek
+    JUMP Z, cross_key
+
+    COMPARE key, 0A             ; test na ABCD
+    JUMP C, num_key
+
+abcd_key:
+    LOAD cmd, 41                ; tisk A, B, C nebo D
+    ADD cmd, key
+    SUB cmd, 0A
+    JUMP flush_key
+num_key:
+    LOAD cmd, 30                ; tisk cisla
+    ADD cmd, key
+    JUMP flush_key
+star_key:
+    LOAD cmd, 2A                ; tisk hvezdicky
+    JUMP flush_key
+cross_key:
+    LOAD cmd, 23                ; tisk krizku
+flush_key:
+    OUTPUT  cmd, LCD_RS_PORT    ; posleme klavesu na LCD
+end_kb:
+    STORE key, LAST_KEY			  ; poznamename si posledni klavesu
+    RETURNI ENABLE              ; navrat s opetovnym povolenim preruseni (lze opet zadavat klavesy)
+
+
+; =====================
+; interrupt vector, registrace obsluhy klavesnice
+    address 3ff             
+    JUMP    keyboard
