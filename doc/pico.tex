@@ -1,0 +1,101 @@
+% Author: Jan Viktorin
+% License: GNU GPL
+% Created: 2010-1-2
+
+\documentclass[10pt,a4paper]{article}
+
+\def\KCPSM#1{\texttt{KCPSM#1}}
+\def\FPGA{\texttt{FPGA}}
+\def\Xilinx{\textit{Xilinx}}
+\def\WIN{\textit{MS Windows}}
+\def\VHDL{\texttt{VHDL}}
+\def\NOT{\textbf{NOT}}
+\def\HEX{\texttt{HEX}}
+
+\def\ins #1{\texttt{#1}}
+
+\begin{document}
+\author{Jan Viktorin}
+\title{Alternative assembler for \textit{PicoBlaze} (\KCPSM3)}
+\maketitle
+
+\begin{abstract}
+\KCPSM3 is a processor core for use in \FPGA\ from \Xilinx. \Xilinx\ offers it to download and
+	synthetize for free from their website. They ship it with an assembler (\texttt{KCPSM3.EXE}).
+	This program can be run on \WIN\ only, because no source code is provided. Those days there are
+	available (as I know) two other implementations -- in \texttt{C++} and in \texttt{Java}. 
+	But nothing in pure C (that's a pity, isn't it?).
+
+	I decided that it could be nice to have an open source assembler for \KCPSM3 written in C.
+	This document describes my implementation of this idea.
+\end{abstract}
+
+\paragraph{Project goals}
+I was trying to make a small program available under a GPL license, that does translation of \KCPSM3 source code
+	to a \HEX\footnote{Careful, it is \NOT\ the Intel \HEX\ file, the output is same as the original \texttt{KCPSM3.EXE}
+	does.} file. It can also produce some debugging info in a listing file. 
+
+The program is written in C99, that means that it is possible to compile it for nearly any platform with
+	only a few changes. I'm going to use the program on PC and on an embedded device -- here it can pass the assembled 
+	instructions directly to the \KCPSM3\ processor in a connected \FPGA. The program aims to use as few memory as possible
+	(depends	on the source program). It assembles the whole program in one pass. If you define all constants at the beginning
+	it doesn't need to store much temporary information during the runtime (only future jumps needs that).
+
+\paragraph{Implementation for PC, porting issues}
+The source code I provide is intended for use on PC. Feel free to modify it for your current needs (according to GNU GPL 
+	license). There are some issues that must be considered then.
+\begin{enumerate}
+	\item The program uses system call \texttt{mmap} for reading the source code. On an embedded device this is
+		useless, so there must be written a buffering strategy for that. If you need this change, see module \texttt{buffer.c}.
+	\item If you want to assemble only eg. a line of code (inline assembling?), the current implementation can not do that 
+		(directly), it always outputs all 1024 instructions (because of calling \texttt{output\_flush}). It is not difficult 
+		to change this behaviour.
+	\item If you have a device with the \FPGA\ directly connected, it is possible to send the assembled program directly there.
+		To do this, change the module \texttt{output}.
+	\item It is also possible to run more instances of the assembler in different threads without collisions (each threat uses its
+		own data storage, there are no global variables), each assembler run is thread safe.
+	\item I recommend to create a special header file for every different platform, that needs some wild changes (as it is done
+		for PC -- \texttt{pc.h}).		
+\end{enumerate}
+
+\paragraph{Differences between the original and my program}
+My implementation is \NOT\ fully compatible with original program 
+	shipped with the processor core. The most important differences are mentioned here:
+\begin{enumerate}
+	\item Registers in the basic form \texttt{"sX"} are case sensitive (thus \texttt{"sA"} is recognized, but \texttt{"sa"} 
+		or \texttt{"Sa"} or \texttt{"SA"} is not recognized). This is realy important difference, because the original
+		program treats everything case insensitive but labels case sensitive. 
+	\item The original program writes many files, eg. \VHDL\ and \texttt{Verilog} source codes with
+		the assembled program. My program writes only the file with the result and a listing file (if requested).
+		I follow the Linux way of programming, that one program should be small and do only the basic job.
+		It is not difficult to write a script that converts output of my program to a \VHDL\ code that looks 
+		the same as the \Xilinx's \texttt{KCPSM3.EXE} does.
+	\item My program supports some shotcuts\footnote{Must be compiled with preprocessor flag \texttt{-DSHORTCUTS\_EXTENSION}.} 
+		similar (and compatible) to those from \texttt{pBlazIDE}. Namely: \ins{ADDC}, \ins{SUBC}, \ins{COMP}, \ins{IN}, \ins{OUT}, 
+	   \ins{EINT}, \ins{DINT}, \ins{RET}, \ins{RETI}. For instructions with indirect access (\ins{IN}, \ins{OUT}, \ins{FETCH}, 
+		\ins{STORE}) it is not necessary	to write paranthesis around the second register operand.
+\end{enumerate}
+
+\paragraph{Compilation}
+To compile the assembler, simply use \textit{GNU make} tool:
+\begin{verbatim}
+  $ make
+\end{verbatim}
+
+If you want to activate the \texttt{pBlazIDE}-like extension, type this instead:
+\begin{verbatim}
+  $ CFLAGS=-DSHORTCUTS_EXTENSION make
+\end{verbatim}
+
+\paragraph{Usage of the assembler}
+After you successfully compile the staff, you can start to use the program like this:
+\begin{verbatim}
+  $ ./pico -i program.psm -o program.hex -l program.l
+\end{verbatim}
+You can skip any of the options. When you skip \texttt{-i} parameter (the input file), program tries to read from the \texttt{stdin}
+	(but this can fail because of using \texttt{mmap}). When you skip the \texttt{-o} option (output file), the assembled result
+	is written to \texttt{stdout}. Skipping of \texttt{-l} option will disallow creation of the listing file.
+
+	It is possible to use another two options: \texttt{-q} (quite mode -- no error messages) and \texttt{-h} (prints help).
+
+\end{document}
