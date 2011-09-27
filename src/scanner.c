@@ -416,6 +416,9 @@ struct stab_data *stab_newdata(char *key)
 	const int keylen = strlen(key);
 	struct stab_data *data = (struct stab_data *) malloc(STAB_DATA_LEN + keylen + 1);
 
+	if(data == NULL)
+		return NULL;
+
 	memcpy(data->key, key, keylen + 1);
 	data->len = keylen;
 	data->flg = F_UNKNOWN;
